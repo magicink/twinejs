@@ -1,5 +1,6 @@
 import {app, dialog, shell} from 'electron';
 import {copy, mkdirp, readdir, remove, stat} from 'fs-extra';
+import {join, sep} from 'path';
 import {getAppPref, setAppPref} from '../app-prefs';
 import {showRelaunchDialog} from '../relaunch-dialog';
 import {
@@ -17,6 +18,18 @@ jest.mock('../app-prefs');
 jest.mock('../relaunch-dialog');
 
 const getAppPrefMock = getAppPref as jest.Mock;
+
+const storiesDir = join(
+	'mock-electron-app-path-documents',
+	'common.appName',
+	'electron.storiesDirectoryName'
+);
+const backupsDir = join(
+	'mock-electron-app-path-documents',
+	'common.appName',
+	'electron.backupsDirectoryName'
+);
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 beforeEach(() => {
 	getAppPrefMock.mockImplementation((name: string) => {
@@ -41,11 +54,11 @@ describe('backupStoryDirectory()', () => {
 		]);
 		statMock.mockImplementation((name: string) => {
 			switch (name) {
-				case 'mock-electron-app-path-documents/common.appName/electron.backupsDirectoryName/mock-backup-1':
-				case 'test-app-pref-backup-directory/mock-backup-1':
+				case join(backupsDir, 'mock-backup-1'):
+				case join('test-app-pref-backup-directory', 'mock-backup-1'):
 					return {mtimeMs: 1000};
-				case 'mock-electron-app-path-documents/common.appName/electron.backupsDirectoryName/mock-backup-2':
-				case 'test-app-pref-backup-directory/mock-backup-2':
+				case join(backupsDir, 'mock-backup-2'):
+				case join('test-app-pref-backup-directory', 'mock-backup-2'):
 					return {mtimeMs: 500};
 				default:
 					throw new Error(`Asked to stat unmocked file: ${name}`);
@@ -56,11 +69,7 @@ describe('backupStoryDirectory()', () => {
 	});
 
 	describe.each([
-		[
-			"isn't set",
-			undefined,
-			'mock-electron-app-path-documents/common.appName/electron.backupsDirectoryName'
-		],
+		["isn't set", undefined, backupsDir],
 		[
 			'is set',
 			'test-app-pref-backup-directory',
@@ -81,8 +90,8 @@ describe('backupStoryDirectory()', () => {
 			await backupStoryDirectory();
 			expect(copyMock.mock.calls).toEqual([
 				[
-					'mock-electron-app-path-documents/common.appName/electron.storiesDirectoryName',
-					expect.stringMatching(new RegExp(`${path}/.+`))
+					storiesDir,
+					expect.stringMatching(new RegExp(`^${escapeRegex(path + sep)}.+`))
 				]
 			]);
 		});
@@ -96,12 +105,12 @@ describe('backupStoryDirectory()', () => {
 
 		it('prunes the oldest backups if the number of backups is above the limit', async () => {
 			await backupStoryDirectory(1);
-			expect(removeMock.mock.calls).toEqual([[`${path}/mock-backup-2`]]);
+			expect(removeMock.mock.calls).toEqual([[join(path, 'mock-backup-2')]]);
 			removeMock.mockReset();
 			await backupStoryDirectory(0);
 			expect(removeMock.mock.calls).toEqual([
-				[`${path}/mock-backup-2`],
-				[`${path}/mock-backup-1`]
+				[join(path, 'mock-backup-2')],
+				[join(path, 'mock-backup-1')]
 			]);
 		});
 
@@ -196,7 +205,7 @@ describe('initStoryDirectoryPath()', () => {
 	it('returns the default path if no app pref is set', async () => {
 		await initStoryDirectory();
 		expect(getStoryDirectoryPath()).toBe(
-			'mock-electron-app-path-documents/common.appName/electron.storiesDirectoryName'
+			storiesDir
 		);
 	});
 
@@ -270,7 +279,7 @@ describe('initStoryDirectoryPath()', () => {
 				showMessageBoxMock.mockResolvedValue({response: 0});
 				await initStoryDirectory();
 				expect(getStoryDirectoryPath()).toBe(
-					'mock-electron-app-path-documents/common.appName/electron.storiesDirectoryName'
+					storiesDir
 				);
 				expect(quitMock).not.toBeCalled();
 			});
@@ -291,7 +300,7 @@ describe('revealStoryDirectoryPath()', () => {
 		await revealStoryDirectory();
 		expect(openPathSpy.mock.calls).toEqual([
 			[
-				'mock-electron-app-path-documents/common.appName/electron.storiesDirectoryName'
+				storiesDir
 			]
 		]);
 	});
