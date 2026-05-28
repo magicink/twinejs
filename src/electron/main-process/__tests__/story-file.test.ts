@@ -1,4 +1,5 @@
 import {app, dialog, shell} from 'electron';
+import {join} from 'path';
 import {
 	mkdtemp,
 	move,
@@ -49,14 +50,14 @@ describe('deleteStory', () => {
 	it('moves the story to the trash', async () => {
 		await deleteStory(story);
 		expect(trashItemMock.mock.calls).toEqual([
-			[`mock-story-directory/${storyFileName(story)}`]
+			[join('mock-story-directory', storyFileName(story))]
 		]);
 	});
 
 	it('stops tracking the file for changes', async () => {
 		await deleteStory(story);
 		expect(stopTrackingFileMock.mock.calls).toEqual([
-			[`mock-story-directory/${storyFileName(story)}`]
+			[join('mock-story-directory', storyFileName(story))]
 		]);
 	});
 
@@ -94,10 +95,10 @@ describe('loadStories', () => {
 		readdirMock.mockResolvedValue(['test-story-1.html', 'test-story-2.html']);
 		readFileMock.mockImplementation((name: string) => {
 			switch (name) {
-				case 'mock-story-directory/test-story-1.html':
+				case join('mock-story-directory', 'test-story-1.html'):
 					return Promise.resolve('mock story 1 contents');
 
-				case 'mock-story-directory/test-story-2.html':
+				case join('mock-story-directory', 'test-story-2.html'):
 					return Promise.resolve('mock story 2 contents');
 
 				default:
@@ -106,13 +107,13 @@ describe('loadStories', () => {
 		});
 		statMock.mockImplementation((name: string) => {
 			switch (name) {
-				case 'mock-story-directory/test-story-1.html':
+				case join('mock-story-directory', 'test-story-1.html'):
 					return Promise.resolve({
 						isDirectory: () => false,
 						mtime: new Date('1/1/1990')
 					});
 
-				case 'mock-story-directory/test-story-2.html':
+				case join('mock-story-directory', 'test-story-2.html'):
 					return Promise.resolve({
 						isDirectory: () => false,
 						mtime: new Date('1/1/2000')
@@ -163,13 +164,13 @@ describe('loadStories', () => {
 	it('ignores directories', async () => {
 		statMock.mockImplementation((name: string) => {
 			switch (name) {
-				case 'mock-story-directory/test-story-1.html':
+				case join('mock-story-directory', 'test-story-1.html'):
 					return Promise.resolve({
 						isDirectory: () => false,
 						mtime: new Date('1/1/1990')
 					});
 
-				case 'mock-story-directory/test-story-2.html':
+				case join('mock-story-directory', 'test-story-2.html'):
 					return Promise.resolve({
 						isDirectory: () => true,
 						mtime: new Date('1/1/2000')
@@ -191,8 +192,8 @@ describe('loadStories', () => {
 	it('begins tracking all story files', async () => {
 		await loadStories();
 		expect(fileWasTouchedMock.mock.calls).toEqual([
-			['mock-story-directory/test-story-1.html'],
-			['mock-story-directory/test-story-2.html']
+			[join('mock-story-directory', 'test-story-1.html')],
+			[join('mock-story-directory', 'test-story-2.html')]
 		]);
 	});
 
@@ -204,8 +205,8 @@ describe('loadStories', () => {
 		]);
 		await loadStories();
 		expect(fileWasTouchedMock.mock.calls).toEqual([
-			['mock-story-directory/test-story-1.html'],
-			['mock-story-directory/test-story-2.html']
+			[join('mock-story-directory', 'test-story-1.html')],
+			[join('mock-story-directory', 'test-story-2.html')]
 		]);
 	});
 
@@ -214,10 +215,10 @@ describe('loadStories', () => {
 
 		readFileMock.mockImplementation((name: string) => {
 			switch (name) {
-				case 'mock-story-directory/test-story-1.html':
+				case join('mock-story-directory', 'test-story-1.html'):
 					return Promise.resolve('mock story 1 contents');
 
-				case 'mock-story-directory/test-story-2.html':
+				case join('mock-story-directory', 'test-story-2.html'):
 					return Promise.reject(mockError);
 
 				default:
@@ -287,8 +288,8 @@ describe('renameStory', () => {
 		await renameStory(oldStory, newStory);
 		expect(renameMock.mock.calls).toEqual([
 			[
-				`mock-story-directory/${oldFileName}`,
-				`mock-story-directory/${newFileName}`
+				join('mock-story-directory', oldFileName),
+				join('mock-story-directory', newFileName)
 			]
 		]);
 	});
@@ -296,14 +297,14 @@ describe('renameStory', () => {
 	it('stops tracking the old filename', async () => {
 		await renameStory(oldStory, newStory);
 		expect(stopTrackingFileMock.mock.calls).toEqual([
-			[`mock-story-directory/${oldFileName}`]
+			[join('mock-story-directory', oldFileName)]
 		]);
 	});
 
 	it('tracks the new filename', async () => {
 		await renameStory(oldStory, newStory);
 		expect(fileWasTouchedMock.mock.calls).toEqual([
-			[`mock-story-directory/${newFileName}`]
+			[join('mock-story-directory', newFileName)]
 		]);
 	});
 
@@ -360,21 +361,17 @@ describe('saveStoryHtml()', () => {
 
 	it('saves the HTML to a temp file, then replaces the destination with the temp file', async () => {
 		await saveStoryHtml(story, 'story html');
+		const tempFilePath = join(
+			`mkdtemp-mock-${join('mock-electron-app-path-temp', `twine-${story.id}`)}`,
+			storyFileName(story)
+		);
 		expect(writeFileMock.mock.calls).toEqual([
-			[
-				`mkdtemp-mock-mock-electron-app-path-temp/twine-${
-					story.id
-				}/${storyFileName(story)}`,
-				'story html',
-				'utf8'
-			]
+			[tempFilePath, 'story html', 'utf8']
 		]);
 		expect(moveMock.mock.calls).toEqual([
 			[
-				`mkdtemp-mock-mock-electron-app-path-temp/twine-${
-					story.id
-				}/${storyFileName(story)}`,
-				`mock-story-directory/${storyFileName(story)}`,
+				tempFilePath,
+				join('mock-story-directory', storyFileName(story)),
 				{overwrite: true}
 			]
 		]);
@@ -383,7 +380,7 @@ describe('saveStoryHtml()', () => {
 	it('tracks that the destination file has changed', async () => {
 		await saveStoryHtml(story, 'story html');
 		expect(fileWasTouchedMock.mock.calls).toEqual([
-			[`mock-story-directory/${storyFileName(story)}`]
+			[join('mock-story-directory', storyFileName(story))]
 		]);
 	});
 
